@@ -1,0 +1,37 @@
+filebeat.inputs:
+  - type: container
+    enabled: true
+    paths:
+      - '/var/lib/docker/containers/*/*.log'
+    
+    # Parse JSON logs from Docker
+    json.keys_under_root: true
+    json.add_error_key: true
+    
+    # Add container metadata
+    processors:
+      - add_docker_metadata:
+          host: "unix:///var/run/docker.sock"
+      
+      - decode_json_fields:
+          fields: ["message"]
+          target: ""
+          overwrite_keys: true
+
+# Output to Logstash
+output.logstash:
+  hosts: ["logstash:5000"]
+  
+# Logging
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
+
+# Disable config file ownership checks (for Docker)
+filebeat.config:
+  modules:
+    enabled: false

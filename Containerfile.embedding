@@ -1,0 +1,8 @@
+FROM docker.io/python:3.11-slim
+WORKDIR /app
+# Add host network access for Ollama
+RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["python", "main.py"]

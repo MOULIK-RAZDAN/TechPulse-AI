@@ -1,0 +1,32 @@
+# Web
+fastapi==0.108.0
+uvicorn[standard]==0.25.0
+
+# Vector DB
+qdrant-client==1.7.0
+
+# OpenAI stack (MUST be aligned)
+# openai==1.30.1
+httpx>=0.24.1,<1.0.0
+ollama==0.4.4
+# LangChain (pin as a set)
+langchain==0.1.16
+langchain-community==0.0.32
+langchain-core==0.1.45
+
+# Anthropic
+anthropic==0.28.0
+
+# DB / Cache
+psycopg2-binary==2.9.9
+redis==5.0.1
+
+# Config / Models
+python-dotenv==1.0.0
+pydantic>=2.9.0,<3.0.0
+
+kafka-python==2.0.2
+
+feedparser>=6.0.10
+duckduckgo-search>=4.1.1
+newspaper4k>=0.9.3
