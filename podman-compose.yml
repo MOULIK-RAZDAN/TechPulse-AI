@@ -102,7 +102,8 @@ services:
     image: docker.io/confluentinc/cp-kafka:7.5.0
     container_name: techpulse-kafka
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_started
     ports:
       - "9092:9092"
     environment:
@@ -116,6 +117,12 @@ services:
       - ./kafka-config:/kafka-config:Z
     networks:
       - techpulse-network
+    healthcheck:  # ← Add health check
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s  
     logging:
       driver: json-file
       options:
@@ -186,8 +193,10 @@ services:
       dockerfile: ../Containerfile.scraper
     container_name: techpulse-scraper
     depends_on:
-      - kafka
-      - logstash
+      kafka:
+        condition: service_healthy  # ← Wait for Kafka to be healthy
+      logstash:
+        condition: service_started
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       LOGSTASH_HOST: logstash
@@ -196,6 +205,7 @@ services:
       - ./scrapers:/app:Z
     networks:
       - techpulse-network
+    restart: unless-stopped  # ← Auto-restart on failure
     logging:
       driver: json-file
       options:

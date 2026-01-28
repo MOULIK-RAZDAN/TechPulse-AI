@@ -90,3 +90,39 @@ Batch Processing & Async
 ## Upgrades - 
 Hashing & Atomic Logic
 Use the URL + Chunk Index to create a stable ID. This is your primary defense against duplication.
+
+
+
+
+## Changes made for Better performance
+1. Data & Retrieval Enhancements (The "Brain" Upgrades)
+The quality of an AI's answer is only as good as the data it finds.
+
+**Hybrid Search Implementation:** Combine your current Vector Search (semantic) with BM25 Keyword Search. This ensures that if you search for a specific product name (e.g., "M4 Mac Mini"), the system finds the exact keyword match even if the "meaning" is similar to other products.
+
+**Reranking Layer:** Use a small "Cross-Encoder" model (like BGE-Reranker) after retrieval. If Qdrant gives you 10 articles, the Reranker will double-check them against the query to ensure the #1 result is truly the most relevant.
+
+**Semantic Chunking:** Instead of just cutting text every 800 characters, we can use an AI-based splitter that breaks text only when the topic changes. This keeps related ideas together.
+
+2. Intelligent Agents (The "Agentic" Shift)
+Instead of just answering a question, the system should "think" about how to solve it.
+
+**Query Expansion:** If a user types "Nvidia earnings," the agent can expand this to "Nvidia Q3 2025 financial results revenue growth" to get better search results.
+
+**Self-Correction Loop:** After generating an answer, have the LLM check its own work: "Does this answer cite the sources correctly? Is there any hallucination?"
+
+**Multi-Source Synthesis:** Enable the system to compare a tech blog post with an arXiv research paper to explain the "hype" vs. the "science."
+
+3. Engineering & Performance (The "Engine" Upgrades)
+Make the system faster and more reliable.
+
+**Streaming Responses:** Update the FastAPI and Next.js connection to use Server-Sent Events (SSE). This allows the user to see the answer being typed out in real-time rather than waiting for the whole paragraph to finish.
+
+**Knowledge Graph Integration:** Map relationships between tech companies (e.g., "OpenAI" → "partnered with" → "Microsoft"). This allows the RAG to answer complex questions like "How do Microsoft's recent AI changes affect its partners?"
+
+**Observability (Arize Phoenix / LangSmith):** Add a dashboard to see exactly what the system "retrieved" for every user question. This helps us find and fix "blind spots" in our data.
+
+4. User Experience (The "Interface" Upgrades)
+**Trend Visualizations:** Use the data in PostgreSQL to create a "Trending Topics" chart on the frontend (e.g., a word cloud or bar chart of what tech blogs are talking about today).
+
+**Citation Tooltips:** Instead of just links at the bottom, make it so users can hover over a sentence to see the exact snippet of the article that supported that claim.

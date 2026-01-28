@@ -1,7 +1,7 @@
 from kafka import KafkaConsumer
 import json
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from qdrant_client.models import Distance, VectorParams, PointStruct, TextIndexParams, TokenizerType
 import psycopg2
 import uuid
 import logging
@@ -37,9 +37,10 @@ class IndexerService:
         logger.info("✓ Indexer service initialized")
     
     def ensure_collection(self):
-        """Create Qdrant collection if it doesn't exist"""
+        """Create Qdrant collection and Text Index if they don't exist"""
         collections = [c.name for c in self.qdrant.get_collections().collections]
         
+        # 1. Create the collection if missing
         if 'tech_articles' not in collections:
             self.qdrant.create_collection(
                 collection_name='tech_articles',
@@ -49,8 +50,27 @@ class IndexerService:
                 )
             )
             logger.info("✓ Created Qdrant collection with 768 dimensions")
-        else:
-            logger.info("✓ Qdrant collection already exists")
+        
+        # 2. Add the Text Index (This enables Keyword/Hybrid Search)
+        # We put this outside the 'if' so it updates your existing database too!
+        try:
+            self.qdrant.create_payload_index(
+                collection_name="tech_articles",
+                field_name="text", # The field containing your article content
+                field_schema=TextIndexParams(
+                    type="text",
+                    tokenizer=TokenizerType.WORD,
+                    lowercase=True,
+                )
+            )
+            logger.info("✓ Keyword index enabled on 'text' field")
+        except Exception as e:
+            # If the index already exists, Qdrant might throw an error. 
+            # We catch it so the service keeps running.
+            if "already indexed" in str(e).lower():
+                logger.info("✓ Keyword index already exists")
+            else:
+                logger.error(f"⚠️ Could not create keyword index: {e}")
     
     # Replace your entire index_article method with this:
     def index_article(self, data):
