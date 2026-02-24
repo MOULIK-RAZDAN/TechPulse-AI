@@ -1,10 +1,12 @@
 import feedparser
-from duckduckgo_search import DDGS
 from newspaper import Article
 import logging
 from typing import List, Dict
 from datetime import datetime
 import urllib.parse
+import arxiv
+import asyncio
+from asyncddgs import aDDGS as AsyncDDGS
 
 logger = logging.getLogger(__name__)
 
@@ -12,14 +14,16 @@ class RealtimeSearchService:
     """Fallback search when Qdrant has insufficient results"""
     
     def __init__(self):
-        self.ddgs = DDGS()
+        """Initialize the realtime search service"""
+        self.logger = logging.getLogger(__name__)
     
-    def search_google_news(self, query: str, max_results: int = 5) -> List[Dict]:
+    async def search_google_news(self, query: str, max_results: int = 5) -> List[Dict]:
         """Search Google News RSS for a topic"""
         try:
             safe_query = urllib.parse.quote_plus(query)
             url = f"https://news.google.com/rss/search?q={safe_query}&hl=en&gl=US&ceid=US:en"
-            feed = feedparser.parse(url)
+            loop = asyncio.get_event_loop()
+            feed = await loop.run_in_executor(None, feedparser.parse, url)
             
             articles = []
             for entry in feed.entries[:max_results]:
@@ -31,73 +35,90 @@ class RealtimeSearchService:
                     'summary': entry.get('summary', '')
                 })
             
-            logger.info(f"📰 Google News: Found {len(articles)} articles for '{query}'")
+            logger.info(f"Google News: Found {len(articles)} articles for '{query}'")
             return articles
             
         except Exception as e:
             logger.error(f"Google News error: {e}")
             return []
     
-    def search_duckduckgo(self, query: str, max_results: int = 5) -> List[Dict]:
-        """Search DuckDuckGo for current info"""
+    async def search_duckduckgo(self, query: str, max_results: int = 5) -> List[Dict]:
+        """Search DuckDuckGo using AsyncDDGS context manager"""
         try:
-            results = list(self.ddgs.text(query, max_results=max_results))
-            
-            articles = []
-            for r in results:
-                articles.append({
-                    'title': r.get('title', ''),
-                    'link': r.get('href', ''),
-                    'source': 'DuckDuckGo',
-                    'summary': r.get('body', '')
-                })
-            
-            logger.info(f"🔍 DuckDuckGo: Found {len(articles)} results for '{query}'")
-            return articles
-            
+            async with AsyncDDGS() as ddgs:
+                # Note: In recent versions, text() returns a list directly when awaited
+                results = await ddgs.text(query, max_results=max_results)
+                
+            return [{
+                'title': r.get('title', ''),
+                'link': r.get('href', ''),
+                'source': 'DuckDuckGo',
+                'summary': r.get('body', '')
+            } for r in results]
         except Exception as e:
             logger.error(f"DuckDuckGo error: {e}")
             return []
     
-    def extract_article_content(self, url: str) -> str:
-        """Extract full text from article URL using Newspaper4k"""
+    async def fetch_arxiv_papers(self, query: str, limit: int = 3):
+        """Integrated Arxiv logic into the main service"""
         try:
-            article = Article(url)
-            article.download()
-            article.parse()
-            
-            # Return full text (limit to 2000 chars to avoid context overload)
-            return article.text[:2000]
-            
+            # arxiv library is sync, so we run in executor
+            def _search():
+                client = arxiv.Client()
+                search = arxiv.Search(query=query, max_results=limit, sort_by=arxiv.SortCriterion.Relevance)
+                return list(client.results(search))
+
+            loop = asyncio.get_event_loop()
+            results = await loop.run_in_executor(None, _search)
+
+            return [{
+                "title": r.title,
+                "summary": r.summary,
+                "link": r.pdf_url,
+                "source": "arXiv Research"
+            } for r in results]
         except Exception as e:
-            logger.warning(f"Failed to extract {url}: {e}")
+            logger.error(f"Arxiv error: {e}")
+            return []
+
+    async def extract_content(self, url: str) -> str:
+        """Async-wrapped article extraction"""
+        try:
+            def _extract():
+                article = Article(url)
+                article.download()
+                article.parse()
+                return article.text[:2000]
+
+            loop = asyncio.get_event_loop()
+            return await asyncio.wait_for(loop.run_in_executor(None, _extract), timeout=10.0)
+        except Exception:
             return ""
-    
-    def hybrid_search(self, query: str, max_results: int = 5) -> List[Dict]:
+
+    async def hybrid_search(self, query: str, max_results: int = 5) -> List[Dict]:
         """
-        Combines Google News + DuckDuckGo + full article extraction
-        Returns enriched articles with full content
+        THE KEY CHANGE: Executes all searches in PARALLEL using asyncio.gather.
         """
-        # Step 1: Get initial results
-        google_articles = self.search_google_news(query, max_results=3)
-        ddg_articles = self.search_duckduckgo(query, max_results=2)
+        # Step 1: Fire all searches at once
+        tasks = [
+            self.search_google_news(query, max_results=3),
+            self.search_duckduckgo(query, max_results=2),
+            self.fetch_arxiv_papers(query, limit=2)
+        ]
         
-        all_articles = google_articles + ddg_articles
+        # results will be a list of lists: [[google], [ddg], [arxiv]]
+        results = await asyncio.gather(*tasks)
+        all_articles = [item for sublist in results for item in sublist]
         
-        # Step 2: Enrich with full content
+        # Step 2: Parallelize content extraction for the top hits
+        extraction_tasks = [self.extract_content(a['link']) for a in all_articles[:max_results]]
+        contents = await asyncio.gather(*extraction_tasks)
+        
         enriched = []
-        for article in all_articles[:max_results]:
-            full_text = self.extract_article_content(article['link'])
+        for i, article in enumerate(all_articles[:max_results]):
+            article['content'] = contents[i] if contents[i] else article.get('summary', '')
+            enriched.append(article)
             
-            if full_text:
-                article['content'] = full_text
-                enriched.append(article)
-            else:
-                # Fallback to summary if extraction fails
-                article['content'] = article.get('summary', '')
-                enriched.append(article)
-        
-        logger.info(f"✅ Hybrid search complete: {len(enriched)} articles with content")
         return enriched
     
     def build_context_from_search(self, articles: List[Dict]) -> str:
