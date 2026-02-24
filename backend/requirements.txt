@@ -1,14 +1,16 @@
 # Web
 fastapi==0.108.0
 uvicorn[standard]==0.25.0
+sse-starlette==1.8.2
 
 # Vector DB
-qdrant-client==1.7.0
+qdrant-client>=1.12.0
 
 # OpenAI stack (MUST be aligned)
 # openai==1.30.1
 httpx>=0.24.1,<1.0.0
 ollama==0.4.4
+
 # LangChain (pin as a set)
 langchain==0.1.16
 langchain-community==0.0.32
@@ -28,8 +30,10 @@ pydantic>=2.9.0,<3.0.0
 kafka-python==2.0.2
 
 feedparser>=6.0.10
-duckduckgo-search>=4.1.1
+duckduckgo-search>=6.0.0
 newspaper4k>=0.9.3
+arxiv>=2.1.0
+asyncddgs>=0.1.0a1
 
 # Reranking
 flashrank>=0.2.5
