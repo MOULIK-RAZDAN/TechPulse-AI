@@ -59,18 +59,23 @@ class EmbeddingService:
                 elif isinstance(resp, dict) and "embeddings" in resp:
                     embedding = resp["embeddings"][0]
                 else:
+                    logger.error(f"Unexpected response format: {resp}")
                     raise RuntimeError(f"Could not parse Ollama response: {type(resp)}")
                 
-                # Validate dimension
-                if not embedding or len(embedding) != 768:
-                    raise RuntimeError(
-                        f"Invalid embedding size: expected 768, got {len(embedding) if embedding else 0}"
-                    )
+                # 2. Ensure it's a flat list of floats
+                if not isinstance(embedding, list):
+                    embedding = list(embedding)
+
+                # 3. Validate dimension
+                if len(embedding) != 768:
+                    logger.error(f"Dimension Mismatch: Expected 768, got {len(embedding)}")
+                    # If you get 1536, you might be using a different model accidentally
+                    raise RuntimeError(f"Invalid embedding size: {len(embedding)}")
                 
                 embeddings.append(embedding)
                 
             except Exception as e:
-                logger.error(f"❌ Error generating embedding: {e}")
+                logger.error(f"Ollama embedding error: {e}")
                 raise
         
         return embeddings

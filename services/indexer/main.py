@@ -100,7 +100,7 @@ class IndexerService:
                 self.pg_conn.commit()
                 logger.info(f"  [1/2] Postgres: OK")
         except Exception as e:
-            logger.error(f"  ❌ Postgres error: {e}")
+            logger.error(f"Postgres error: {e}")
 
         # 2. Qdrant
         try:
@@ -121,7 +121,7 @@ class IndexerService:
                 self.qdrant.upsert(collection_name='tech_articles', points=points)
                 logger.info(f"  [2/2] Qdrant: Indexed {len(points)} chunks")
         except Exception as e:
-            logger.error(f"  ❌ Qdrant error: {e}")
+            logger.error(f"Qdrant error: {e}")
     
     def run(self):
         logger.info("Indexer waiting for messages...")
@@ -144,12 +144,12 @@ class IndexerService:
                 logger.info(f"✓ Successfully indexed: {title}")
 
             except KeyError as e:
-                logger.error(f"⚠️ Data format error (missing key {e}). Skipping message.")
+                logger.error(f"Data format error (missing key {e}). Skipping message.")
                 continue # Move to the next message
                 
             except Exception as e:
                 # This catches DB timeouts, Embedding errors, etc.
-                logger.error(f"❌ Error processing message: {str(e)}")
+                logger.error(f"Error processing message: {str(e)}")
                 # Optional: import traceback; traceback.print_exc()
                 continue
 
