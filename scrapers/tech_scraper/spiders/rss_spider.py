@@ -29,6 +29,9 @@ class RSSSpider(scrapy.Spider):
         
         # Industry Specific (reliable sources)
         'https://www.technologyreview.com/feed/'      # MIT Tech Review
+        'http://export.arxiv.org/rss/cs.AI',  # AI research
+        'http://export.arxiv.org/rss/cs.LG',  # Machine Learning
+        'http://export.arxiv.org/rss/cs.CL',  # NLP & LLMs
     ]
     
     def __init__(self, *args, **kwargs):
